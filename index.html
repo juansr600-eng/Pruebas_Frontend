@@ -177,7 +177,27 @@
                     const sensorKey = `sensor${i}`;
                     const valor = lastRecord.sensores && lastRecord.sensores[sensorKey] ? lastRecord.sensores[sensorKey].valor : undefined;
                     const fecha = lastRecord.fechaHora ? new Date(lastRecord.fechaHora).toLocaleString('es-ES') : 'N/A';
-                    const estado = valor !== undefined ? 'Activo' : 'Sin datos';
+                    // Determinar estado del sensor
+                    let estado, estadoClass;
+                    if (valor !== undefined) {
+                        const ahora = new Date();
+                        const fechaSensor = new Date(lastRecord.fechaHora);
+                        const minutosTranscurridos = (ahora - fechaSensor) / (1000 * 60);
+                        
+                        if (minutosTranscurridos <= 5) {
+                            estado = 'En línea';
+                            estadoClass = 'label-success';
+                        } else if (minutosTranscurridos <= 30) {
+                            estado = 'Activo';
+                            estadoClass = 'label-info';
+                        } else {
+                            estado = 'Inactivo';
+                            estadoClass = 'label-warning';
+                        }
+                    } else {
+                        estado = 'Sin datos';
+                        estadoClass = 'label-default';
+                    }
                     const valorMostrar = valor !== undefined ? `${valor} mm` : 'N/A';
 
                     const row = `
@@ -186,7 +206,7 @@
                             <td class="sensor-value">${valorMostrar}</td>
                             <td>${fecha}</td>
                             <td>
-                                <span class="label ${estado === 'Activo' ? 'label-success' : 'label-default'}">
+                                <span class="label ${estadoClass}">
                                     ${estado}
                                 </span>
                             </td>
@@ -339,8 +359,8 @@
             console.log('Aplicación iniciada');
             actualizarTablaSensores();
             
-            // Actualizar tabla cada 30 segundos
-            setInterval(actualizarTablaSensores, 30000);
+            // Actualizar tabla cada 5 segundos
+            setInterval(actualizarTablaSensores, 5000);
         });
     </script>
 </body>
