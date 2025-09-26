@@ -150,7 +150,7 @@
         // Variables globales
         const SERVER_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
             ? 'http://localhost:3003' 
-            : 'https://tu-backend-url.com'; // Cambiar por tu URL de hosting
+            : 'https://pruebas-backend-pfqz.onrender.com';
         let datosConsultados = [];
         let paginaActual = 0;
         let tipoPaginacion = 'dias';
@@ -227,35 +227,51 @@
                     return;
                 }
 
+                // Crear gráfica
+                const trace = {
+                    x: sensorData.map(d => d.x),
+                    y: sensorData.map(d => d.y),
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: sensor.toUpperCase(),
+                    line: { color: '#337ab7' }
+                };
+
+                const layout = {
+                    title: `Datos Históricos - ${sensor.toUpperCase()}`,
+                    xaxis: { title: 'Fecha/Hora' },
+                    yaxis: { title: 'Valor (mm)' },
+                    responsive: true
+                };
+
+                Plotly.newPlot('myPlot', [trace], layout);
                 datosConsultados = sensorData;
-                paginarPor('dias');
                 $('#paginacionControles').show();
-                
+
             } catch (error) {
                 console.error('Error cargando datos del sensor:', error);
-                $('#myPlot').html('<div style="text-align:center;padding:50px;color:#337ab7;"><i class="glyphicon glyphicon-refresh"></i> Obteniendo datos...</div>');
+                $('#myPlot').html('<div style="text-align:center;padding:50px;">Error cargando datos</div>');
             }
         }
 
         // Función para cargar todos los sensores
         async function cargarTodosLosSensores() {
             $('#myPlot').html('<div style="text-align:center;padding:50px;">Cargando datos de todos los sensores...</div>');
-            
+
             try {
                 const allData = await loadAllSensorData();
-                
                 const traces = [];
-                const colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'];
-                
+                const colors = ['#337ab7', '#5cb85c', '#f0ad4e', '#d9534f', '#5bc0de', '#292b2c', '#f7941d', '#6f42c1', '#e83e8c', '#20c997'];
+
                 for (let i = 1; i <= 10; i++) {
-                    const sensorKey = `sensor${i}`;
+                    const sensor = `sensor${i}`;
                     const sensorData = allData
-                        .filter(record => record[sensorKey] !== undefined)
+                        .filter(record => record.sensores && record.sensores[sensor] && record.sensores[sensor].valor !== undefined)
                         .map(record => ({
-                            x: record.fechaa,
-                            y: record[sensorKey]
+                            x: record.fechaHora,
+                            y: record.sensores[sensor].valor
                         }));
-                    
+
                     if (sensorData.length > 0) {
                         traces.push({
                             x: sensorData.map(d => d.x),
@@ -267,389 +283,64 @@
                         });
                     }
                 }
-                
+
                 if (traces.length === 0) {
                     $('#myPlot').html('<div style="text-align:center;padding:50px;">No hay datos disponibles</div>');
                     return;
                 }
-                
+
                 const layout = {
                     title: 'Vista General - Todos los Sensores',
                     xaxis: { title: 'Fecha/Hora' },
                     yaxis: { title: 'Valor (mm)' },
-                    showlegend: true,
                     responsive: true
                 };
-                
-                const config = {
-                    displayModeBar: true,
-                    displaylogo: false,
-                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
-                };
-                
-                Plotly.newPlot('myPlot', traces, layout, config);
+
+                Plotly.newPlot('myPlot', traces, layout);
                 $('#paginacionControles').hide();
-                
+
             } catch (error) {
                 console.error('Error cargando todos los sensores:', error);
-                $('#myPlot').html('<div style="text-align:center;padding:50px;color:#337ab7;"><i class="glyphicon glyphicon-refresh"></i> Obteniendo datos...</div>');
+                $('#myPlot').html('<div style="text-align:center;padding:50px;">Error cargando datos</div>');
             }
         }
 
         // Función para cargar todos los datos del sensor
         async function loadAllSensorData() {
             try {
-                const response = await fetch(`${SERVER_URL}/api/sensores-data?limit=10000`);
-                if (!response.ok) throw new Error('Error en la respuesta del servidor');
+                const response = await fetch(`${SERVER_URL}/api/sensores-data?limit=2000&offset=0`);
                 return await response.json();
             } catch (error) {
                 console.error('Error cargando datos:', error);
-                throw error;
+                return [];
             }
         }
 
-        // Funciones de paginación
+        // Funciones de paginación (placeholder)
         function paginarPor(tipo) {
             tipoPaginacion = tipo;
-            paginaActual = 0;
-            
-            const ahora = new Date();
-            let intervalos = [];
-            
-            switch(tipo) {
-                case 'dias':
-                    for (let i = 0; i < 30; i++) {
-                        const fecha = new Date(ahora);
-                        fecha.setDate(fecha.getDate() - i);
-                        intervalos.push({
-                            inicio: new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate()),
-                            fin: new Date(fecha.getFullYear(), fecha.getMonth(), fecha.getDate() + 1),
-                            nombre: fecha.toLocaleDateString('es-ES')
-                        });
-                    }
-                    break;
-                case 'semanas':
-                    for (let i = 0; i < 12; i++) {
-                        const fecha = new Date(ahora);
-                        fecha.setDate(fecha.getDate() - (i * 7));
-                        const inicioSemana = new Date(fecha);
-                        inicioSemana.setDate(fecha.getDate() - fecha.getDay());
-                        const finSemana = new Date(inicioSemana);
-                        finSemana.setDate(inicioSemana.getDate() + 7);
-                        intervalos.push({
-                            inicio: inicioSemana,
-                            fin: finSemana,
-                            nombre: `Semana del ${inicioSemana.toLocaleDateString('es-ES')}`
-                        });
-                    }
-                    break;
-                case 'meses':
-                    for (let i = 0; i < 12; i++) {
-                        const fecha = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
-                        const finMes = new Date(fecha.getFullYear(), fecha.getMonth() + 1, 1);
-                        intervalos.push({
-                            inicio: fecha,
-                            fin: finMes,
-                            nombre: fecha.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' })
-                        });
-                    }
-                    break;
-                case 'años':
-                    for (let i = 0; i < 5; i++) {
-                        const año = ahora.getFullYear() - i;
-                        intervalos.push({
-                            inicio: new Date(año, 0, 1),
-                            fin: new Date(año + 1, 0, 1),
-                            nombre: año.toString()
-                        });
-                    }
-                    break;
-            }
-            
-            datosPaginados = intervalos;
-            mostrarPagina();
-        }
-
-        function mostrarPagina() {
-            if (datosPaginados.length === 0) return;
-            
-            const intervalo = datosPaginados[paginaActual];
-            const datosFiltrados = datosConsultados.filter(d => {
-                const fecha = new Date(d.x);
-                return fecha >= intervalo.inicio && fecha < intervalo.fin;
-            });
-            
-            if (datosFiltrados.length === 0) {
-                $('#myPlot').html(`<div style="text-align:center;padding:50px;">No hay datos para ${intervalo.nombre}</div>`);
-            } else {
-                const trace = {
-                    x: datosFiltrados.map(d => d.x),
-                    y: datosFiltrados.map(d => d.y),
-                    type: 'scatter',
-                    mode: 'lines+markers',
-                    name: sensorSeleccionado.toUpperCase(),
-                    line: { color: '#337ab7' }
-                };
-                
-                const layout = {
-                    title: `${sensorSeleccionado.toUpperCase()} - ${intervalo.nombre}`,
-                    xaxis: { title: 'Fecha/Hora' },
-                    yaxis: { title: 'Valor (mm)' },
-                    responsive: true
-                };
-                
-                const config = {
-                    displayModeBar: true,
-                    displaylogo: false,
-                    modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
-                };
-                
-                Plotly.newPlot('myPlot', [trace], layout, config);
-            }
-            
-            $('#paginaInfo').text(`Página ${paginaActual + 1} de ${datosPaginados.length}`);
+            console.log('Paginando por:', tipo);
         }
 
         function anteriorPagina() {
             if (paginaActual > 0) {
                 paginaActual--;
-                mostrarPagina();
+                console.log('Página anterior:', paginaActual);
             }
         }
 
         function siguientePagina() {
-            if (paginaActual < datosPaginados.length - 1) {
-                paginaActual++;
-                mostrarPagina();
-            }
+            paginaActual++;
+            console.log('Página siguiente:', paginaActual);
         }
 
         // Inicialización
         $(document).ready(function() {
-            // Actualizar tabla inmediatamente
+            console.log('Aplicación iniciada');
             actualizarTablaSensores();
             
-            // Actualizar tabla cada 5 segundos
-            setInterval(actualizarTablaSensores, 5000);
-            
-            // Mensaje inicial en la gráfica
-            $('#myPlot').html('<div style="text-align:center;padding:50px;color:#666;">Selecciona un sensor para ver sus datos históricos</div>');
-        });
-    </script>
-</body>
-</html>             
-                const traces = [{
-                    x: sensorData.map(d => d.x),
-                    y: sensorData.map(d => d.y),
-                    type: 'scattergl',
-                    mode: 'lines+markers',
-                    marker: { size: 2 },
-                    name: sensor.toUpperCase(),
-                    hovertemplate: '%{x|%d/%m/%Y, %I:%M:%S %p}<br>%{y} mm<extra></extra>'
-                }];
-
-                Plotly.purge('myPlot');
-                Plotly.newPlot('myPlot', traces, {
-                    title: `Historial del ${sensor.toUpperCase()} (${sensorData.length} registros)`,
-                    xaxis: { title: 'Fecha' },
-                    yaxis: { 
-                        title: 'Nivel de Agua (mm)',
-                        ticksuffix: ' mm'
-                    },
-                    autosize: true,
-                    margin: { l: 60, r: 20, t: 50, b: 50 }
-                }, { responsive: true, displayModeBar: true });
-
-                $('#paginacionControles').show();
-
-            } catch (error) {
-                console.error('Error cargando sensor:', error);
-                $('#myPlot').html('<div style="text-align:center;padding:50px;color:red;">Error cargando datos</div>');
-            }
-        }
-
-        // Función para cargar vista general de todos los sensores
-        async function cargarTodosLosSensores() {
-            $('#myPlot').html('<div style="text-align:center;padding:50px;">Cargando vista general...</div>');
-
-            try {
-                const allData = await loadAllSensorData();
-                const traces = [];
-
-                // Crear una traza por cada sensor que tenga datos
-                for (let i = 1; i <= 10; i++) {
-                    const sensorKey = `sensor${i}`;
-                    const sensorData = allData
-                        .filter(record => record[sensorKey] !== undefined)
-                        .map(record => ({
-                            x: record.fechaa,
-                            y: record[sensorKey]
-                        }));
-
-                    if (sensorData.length > 0) {
-                        // Usar solo cada 10mo punto para vista general
-                        const sampledData = sensorData.filter((_, index) => index % 10 === 0);
-                        
-                        traces.push({
-                            x: sampledData.map(d => d.x),
-                            y: sampledData.map(d => d.y),
-                            type: 'scattergl',
-                            mode: 'lines',
-                            name: `Sensor ${i}`,
-                            hovertemplate: '%{x|%d/%m/%Y}<br>%{y} mm<extra></extra>'
-                        });
-                    }
-                }
-
-                if (traces.length === 0) {
-                    $('#myPlot').html('<div style="text-align:center;padding:50px;">No hay datos disponibles</div>');
-                    return;
-                }
-
-                Plotly.purge('myPlot');
-                Plotly.newPlot('myPlot', traces, {
-                    title: `Vista General - Todos los Sensores (${traces.length} sensores activos)`,
-                    xaxis: { title: 'Fecha' },
-                    yaxis: { 
-                        title: 'Nivel de Agua (mm)',
-                        ticksuffix: ' mm'
-                    },
-                    autosize: true,
-                    margin: { l: 60, r: 20, t: 50, b: 50 }
-                }, { responsive: true, displayModeBar: true });
-
-                $('#paginacionControles').hide();
-
-            } catch (error) {
-                console.error('Error cargando vista general:', error);
-                $('#myPlot').html('<div style="text-align:center;padding:50px;color:red;">Error cargando datos</div>');
-            }
-        }
-
-        // Función para cargar todos los datos
-        async function loadAllSensorData() {
-            const allData = [];
-            const limit = 1000;
-            let offset = 0;
-
-            while (true) {
-                try {
-                    const response = await fetch(`${SERVER_URL}/api/sensores-data?limit=${limit}&offset=${offset}`);
-                    if (!response.ok) break;
-
-                    const chunk = await response.json();
-                    if (chunk.length === 0) break;
-
-                    allData.push(...chunk);
-                    offset += chunk.length;
-
-                    if (chunk.length < limit) break;
-
-                } catch (error) {
-                    console.error('Error:', error);
-                    break;
-                }
-            }
-
-            return allData;
-        }
-
-        // Funciones de paginación (simplificadas)
-        function paginarPor(periodo) {
-            if (!datosConsultados || datosConsultados.length === 0) {
-                alert('Primero carga los datos de un sensor');
-                return;
-            }
-
-            tipoPaginacion = periodo;
-            paginaActual = 0;
-
-            const datos = new Map();
-            
-            datosConsultados.forEach(record => {
-                const fecha = new Date(record.x);
-                let clave;
-                
-                switch(periodo) {
-                    case 'dias':
-                        clave = fecha.toISOString().split('T')[0];
-                        break;
-                    case 'semanas':
-                        const semana = new Date(fecha);
-                        semana.setDate(fecha.getDate() - fecha.getDay());
-                        clave = semana.toISOString().split('T')[0];
-                        break;
-                    case 'meses':
-                        clave = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`;
-                        break;
-                    case 'años':
-                        clave = fecha.getFullYear().toString();
-                        break;
-                }
-                
-                if (!datos.has(clave)) datos.set(clave, []);
-                datos.get(clave).push(record);
-            });
-            
-            datosPaginados = Array.from(datos.keys()).sort().map(clave => datos.get(clave));
-            mostrarPagina();
-        }
-
-        function mostrarPagina() {
-            if (!datosPaginados || datosPaginados.length === 0) return;
-            
-            const datosActuales = datosPaginados[paginaActual] || [];
-            
-            Plotly.purge('myPlot');
-            
-            Plotly.newPlot('myPlot', [{
-                x: datosActuales.map(d => d.x),
-                y: datosActuales.map(d => d.y),
-                type: 'scattergl',
-                mode: 'lines+markers',
-                marker: { size: 2 },
-                name: sensorSeleccionado.toUpperCase(),
-                hovertemplate: '%{x|%d/%m/%Y, %I:%M:%S %p}<br>%{y} mm<extra></extra>'
-            }], {
-                title: `${sensorSeleccionado.toUpperCase()} - ${tipoPaginacion.charAt(0).toUpperCase() + tipoPaginacion.slice(1)} - Página ${paginaActual + 1}`,
-                xaxis: { title: 'Fecha' },
-                yaxis: { 
-                    title: 'Nivel de Agua (mm)',
-                    ticksuffix: ' mm'
-                },
-                autosize: true,
-                margin: { l: 60, r: 20, t: 50, b: 50 }
-            }, { responsive: true, displayModeBar: true });
-            
-            $('#paginaInfo').text(`Página ${paginaActual + 1} de ${datosPaginados.length}`);
-            
-            $('button[onclick="anteriorPagina()"]').prop('disabled', paginaActual === 0);
-            $('button[onclick="siguientePagina()"]').prop('disabled', paginaActual >= datosPaginados.length - 1);
-        }
-
-        function anteriorPagina() {
-            if (datosPaginados && paginaActual > 0) {
-                paginaActual--;
-                mostrarPagina();
-            }
-        }
-
-        function siguientePagina() {
-            if (datosPaginados && paginaActual < datosPaginados.length - 1) {
-                paginaActual++;
-                mostrarPagina();
-            }
-        }
-
-        // Inicialización
-        $(document).ready(function() {
-            $('#myPlot').html('<div style="text-align:center;padding:50px;color:#666;">Selecciona un sensor para ver su gráfica</div>');
-            
-            // Actualizar tabla cada 10 segundos
-            actualizarTablaSensores();
-            setInterval(actualizarTablaSensores, 10000);
-            
-            console.log('Monitor de sensores iniciado');
+            // Actualizar tabla cada 30 segundos
+            setInterval(actualizarTablaSensores, 30000);
         });
     </script>
 </body>
