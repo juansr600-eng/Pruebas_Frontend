@@ -234,23 +234,21 @@
             $('#myPlot').html('<div style="text-align:center;padding:50px;">Cargando datos del ' + sensor + '...</div>');
 
             try {
-                const allData = await loadAllSensorData();
-                const sensorData = allData
-                    .filter(record => record.sensores && record.sensores[sensor] && record.sensores[sensor].valor !== undefined)
-                    .map(record => ({
-                        x: record.fechaHora,
-                        y: record.sensores[sensor].valor
-                    }));
+                const sensorData = await loadSensorDataOnDemand(sensor, 200);
+                const chartData = sensorData.map(record => ({
+                    x: record.fechaHora,
+                    y: record.sensores[sensor].valor
+                }));
 
-                if (sensorData.length === 0) {
+                if (chartData.length === 0) {
                     $('#myPlot').html('<div style="text-align:center;padding:50px;">No hay datos para este sensor</div>');
                     return;
                 }
 
                 // Crear gráfica
                 const trace = {
-                    x: sensorData.map(d => d.x),
-                    y: sensorData.map(d => d.y),
+                    x: chartData.map(d => d.x),
+                    y: chartData.map(d => d.y),
                     type: 'scatter',
                     mode: 'lines+markers',
                     name: sensor.toUpperCase(),
@@ -258,14 +256,14 @@
                 };
 
                 const layout = {
-                    title: `Datos Históricos - ${sensor.toUpperCase()}`,
+                    title: `Datos Históricos - ${sensor.toUpperCase()} (${chartData.length} registros)`,
                     xaxis: { title: 'Fecha/Hora' },
                     yaxis: { title: 'Valor (mm)' },
                     responsive: true
                 };
 
                 Plotly.newPlot('myPlot', [trace], layout);
-                datosConsultados = sensorData;
+                datosConsultados = chartData;
                 $('#paginacionControles').show();
 
             } catch (error) {
@@ -325,15 +323,40 @@
             }
         }
 
-        // Función para cargar todos los datos del sensor
-        async function loadAllSensorData() {
+        // Función para cargar datos por lotes (carga por demanda)
+        async function loadSensorDataBatch(limit = 500, offset = 0) {
             try {
-                const response = await fetch(`${SERVER_URL}/api/sensores-data?limit=2000&offset=0`);
+                const response = await fetch(`${SERVER_URL}/api/sensores-data?limit=${limit}&offset=${offset}`);
                 return await response.json();
             } catch (error) {
                 console.error('Error cargando datos:', error);
                 return [];
             }
+        }
+
+        // Función para cargar datos de sensor específico por demanda
+        async function loadSensorDataOnDemand(sensor, limit = 500) {
+            let allData = [];
+            let offset = 0;
+            let hasMore = true;
+            
+            while (hasMore && allData.length < 2000) {
+                const batch = await loadSensorDataBatch(limit, offset);
+                if (batch.length === 0) break;
+                
+                const sensorData = batch.filter(record => 
+                    record.sensores && record.sensores[sensor] && 
+                    record.sensores[sensor].valor !== undefined
+                );
+                
+                allData.push(...sensorData);
+                offset += batch.length;
+                hasMore = batch.length === limit;
+                
+                if (sensorData.length >= 500) break;
+            }
+            
+            return allData;
         }
 
         // Funciones de paginación (placeholder)
